@@ -63,246 +63,158 @@ usuario. También se pueden importar las funciones
 partes del código o para pruebas unitarias.
 """
 
+import sys
 from typing import List, Dict, Tuple
 
-# Valores extremos utilizados para inicializar las comparaciones
-INF_POS = 10**18
-INF_NEG = -10**18
+# Aumentar el límite de recursión es crítico para O(n^3) DP
+# Un n=100 podría generar una profundidad de recursión cercana a 100.
+# Para casos extremos y seguridad, lo elevamos significativamente.
+sys.setrecursionlimit(20000)
 
-
-def construir_arreglo_extendido(values: List[int]) -> List[int]:
-    """Duplica la lista dada para manejar la torta de forma circular.
-
-    Dado un arreglo de largo 2n, devuelve un arreglo de largo 4n
-    que contiene dos copias consecutivas del mismo. Esto simplifica
-    la obtención de subsecuencias que cruzan el final del círculo.
-
-    Args:
-        values: lista original de 2n enteros.
-
-    Returns:
-        Lista de 4n enteros con dos copias de ``values``.
+def max_satisfaccion_array(st: List[int]) -> int:
     """
-    return values * 2
-
-
-def prefix_sums(arr: List[int]) -> List[int]:
-    """Calcula las sumas prefijas de un arreglo.
-
-    Se devuelve una lista ``pref`` tal que ``pref[i]`` es la suma de
-    los primeros ``i`` elementos de ``arr``. De esta forma la suma
-    de un segmento ``arr[a..b]`` puede obtenerse como ``pref[b+1] - pref[a]``.
-
-    Args:
-        arr: lista de enteros.
-
-    Returns:
-        Lista de enteros de largo ``len(arr) + 1`` con las sumas prefijas.
+    Calcula la máxima satisfacción garantizada para el Profesor utilizando
+    Programación Dinámica con Memoización basada en ARREGLOS.
+    
+    Complejidad Temporal: O(n^3)
+    Complejidad Espacial: O(n^2)
     """
-    n = len(arr)
-    pref = [0] * (n + 1)
-    s = 0
-    for i, val in enumerate(arr):
-        s += val
-        pref[i + 1] = s
-    return pref
+    n_slices = len(st)
+    n = n_slices // 2
+    
+    # Duplicamos el arreglo para manejar la circularidad de manera lineal.
+    # Esto permite acceder a rangos como [2n-1, 0, 1] simplemente usando índices.
+    doubled_st = st + st
+    
+    # Precomputamos sumas de prefijos para consultas de rango O(1)
+    prefix_sum =  * (len(doubled_st) + 1)
+    for i in range(len(doubled_st)):
+        prefix_sum[i+1] = prefix_sum[i] + doubled_st[i]
 
+    def get_sum(start, length):
+        """Retorna la suma del segmento [start, start+length-1] en O(1)"""
+        return prefix_sum[start + length] - prefix_sum[start]
 
-def rango_suma(pref: List[int], a: int, b: int) -> int:
-    """Obtiene la suma de arr[a..b] usando las sumas prefijas.
+    # Tabla de Memoización: (2n+1) x (n+1)
+    # Filas: índice de inicio (hasta 2n para cubrir toda la vuelta)
+    # Columnas: longitud del segmento (hasta n)
+    # Inicializamos con un valor centinela (-inf)
+    memo = [[-float('inf')] * (n + 1) for _ in range(2 * n + 1)]
 
-    Args:
-        pref: lista de sumas prefijas asociada al arreglo original.
-        a: índice inicial (inclusive).
-        b: índice final (inclusive).
-
-    Returns:
-        Suma de los elementos del arreglo original entre ``a`` y ``b``.
-    """
-    return pref[b + 1] - pref[a]
-
-
-def max_satisfaccion_array(values: List[int]) -> int:
-    """Versión con memoización en arreglos para el problema Feliz Cumpleaños.
-
-    Implementa la función F(start, length, turn) con tres dimensiones
-    de listas: una para el índice inicial del segmento, otra para la
-    longitud y otra para el turno. El valor ``F(start, length, 0)``
-    representa la máxima suma que el profesor puede asegurar a partir
-    de un segmento de ``length`` porciones que comienza en ``start``
-    cuando es su turno (turn=0). Para turn=1 representa la suma que el
-    profesor obtendrá (posiblemente cero) cuando juega la hermana.
-
-    Args:
-        values: lista de 2n enteros que representan la satisfacción de
-        cada porción de torta.
-
-    Returns:
-        Entero que indica la máxima suma de satisfacción que el
-        profesor puede garantizar.
-    """
-    m = len(values)
-    if m % 2 != 0:
-        raise ValueError("La cantidad de porciones debe ser par (2n).")
-    n = m // 2
-
-    # Construir el arreglo extendido y las sumas prefijas
-    w = construir_arreglo_extendido(values)
-    pref = prefix_sums(w)
-
-    # Estructuras de memoización en arreglos
-    tam_i = len(w)
-    # memo[start][length][turn] guardará el valor de F(start,length,turn)
-    memo = [[[0] * 2 for _ in range(n + 1)] for _ in range(tam_i)]
-    visitado = [[[False] * 2 for _ in range(n + 1)] for _ in range(tam_i)]
-
-    def dp(start: int, length: int, turn: int) -> int:
-        """Subrutina interna de la DP en arreglos."""
-        if visitado[start][length][turn]:
-            return memo[start][length][turn]
-        # Marcar como visitado
-        visitado[start][length][turn] = True
-        # Caso base: una sola porción restante
+    def dp(start: int, length: int) -> int:
+        """
+        Retorna la ganancia MÁXIMA que el jugador actual puede obtener
+        del segmento definido por 'start' y 'length'.
+        """
+        # Caso Base: Solo queda una porción, el jugador se la come.
         if length == 1:
-            res = w[start] if turn == 0 else 0
-            memo[start][length][turn] = res
-            return res
-        # Turno del profesor: busca maximizar
-        if turn == 0:
-            mejor = INF_NEG
-            for s in range(1, length):
-                # Comer prefijo de tamaño s
-                ganancia_prefijo = rango_suma(pref, start, start + s - 1)
-                valor_prefijo = ganancia_prefijo + dp(start + s, length - s, 1)
-                if valor_prefijo > mejor:
-                    mejor = valor_prefijo
-                # Comer sufijo de tamaño s
-                inicio_suf = start + length - s
-                ganancia_sufijo = rango_suma(pref, inicio_suf, start + length - 1)
-                valor_sufijo = ganancia_sufijo + dp(start, length - s, 1)
-                if valor_sufijo > mejor:
-                    mejor = valor_sufijo
-            memo[start][length][turn] = mejor
-            return mejor
-        # Turno de la hermana: minimiza lo que obtendrá el profesor
-        peor = INF_POS
-        for s in range(1, length):
-            valor_prefijo = dp(start + s, length - s, 0)
-            if valor_prefijo < peor:
-                peor = valor_prefijo
-            valor_sufijo = dp(start, length - s, 0)
-            if valor_sufijo < peor:
-                peor = valor_sufijo
-        memo[start][length][turn] = peor
-        return peor
+            return doubled_st[start]
+        
+        # Verificar si ya está calculado
+        if memo[start][length]!= -float('inf'):
+            return memo[start][length]
 
-    mejor_global = INF_NEG
-    # Probar cada ángulo válido para la primera jugada (2n opciones)
-    for k in range(2 * n):
-        # Ganancia inmediata al comer las n porciones comenzando en k
-        ganancia_inicial = sum(values[(k + t) % (2 * n)] for t in range(n))
-        inicio_restante = k + n
-        valor_restante = dp(inicio_restante, n, 1)
-        total = ganancia_inicial + valor_restante
-        if total > mejor_global:
-            mejor_global = total
-    return mejor_global
+        current_total_value = get_sum(start, length)
+        
+        # Lógica Minimax:
+        # El jugador actual hace un corte y deja un segmento al oponente.
+        # El oponente jugará óptimamente para maximizar SU ganancia en ese resto.
+        # Por tanto, el jugador actual obtiene:
+        # Total_Actual - (Lo máximo que el oponente puede sacar del resto)
+        # Para maximizar mi ganancia, debo MINIMIZAR la ganancia máxima del oponente.
+        
+        min_opponent_score = float('inf')
+        
+        # Iteramos sobre todos los cortes posibles.
+        # k representa el tamaño del segmento que se DEJA al oponente.
+        # Geométricamente, al cortar, se generan dos arcos. Uno se come, otro se deja.
+        # Podemos dejar el lado "izquierdo" (prefijo) o el "derecho" (sufijo).
+        
+        for k in range(1, length):
+            # Opción 1: Dejar el prefijo de longitud k al oponente
+            # El oponente jugará en dp(start, k)
+            val_left = dp(start, k)
+            
+            # Opción 2: Dejar el sufijo de longitud k al oponente
+            # El oponente jugará en dp(start + length - k, k)
+            val_right = dp(start + length - k, k)
+            
+            # Buscamos el escenario donde el oponente gane lo MENOS posible
+            move_min = min(val_left, val_right)
+            
+            if move_min < min_opponent_score:
+                min_opponent_score = move_min
+        
+        # Mi mejor resultado es el total menos lo mejor que pude forzar al oponente a tener
+        res = current_total_value - min_opponent_score
+        memo[start][length] = res
+        return res
+
+    # Problema Original: El Profesor elige el primer corte de tamaño n.
+    # Él maximiza: Total de la Torta - (Máxima ganancia de la Hermana en el resto)
+    
+    total_cake = get_sum(0, n_slices)
+    max_prof = -float('inf')
+
+    for i in range(n_slices):
+        # Si el Profesor empieza en i, come [i, i+n-1].
+        # Deja a la hermana el segmento que empieza en i+n con longitud n.
+        sister_best = dp(i + n, n)
+        prof_gain = total_cake - sister_best
+        
+        if prof_gain > max_prof:
+            max_prof = prof_gain
+            
+    return max_prof
 
 
-def max_satisfaccion_hash(values: List[int]) -> int:
-    """Versión con memoización en diccionarios para el problema Feliz Cumpleaños.
-
-    La estructura de estados es idéntica a la de ``max_satisfaccion_array``.
-    En lugar de usar listas tridimensionales, se usa un diccionario
-    ``memo`` que almacena pares clave→valor donde la clave es la
-    tupla ``(start, length, turn)`` y el valor es ``F(start,length,turn)``.
-
-    Args:
-        values: lista de 2n enteros que representan la satisfacción de
-        cada porción de torta.
-
-    Returns:
-        Entero con la máxima suma de satisfacción que el profesor puede
-        asegurar.
+def max_satisfaccion_hash(st: List[int]) -> int:
     """
-    m = len(values)
-    if m % 2 != 0:
-        raise ValueError("La cantidad de porciones debe ser par (2n).")
-    n = m // 2
-    w = construir_arreglo_extendido(values)
-    pref = prefix_sums(w)
-    memo: Dict[Tuple[int, int, int], int] = {}
+    Calcula la máxima satisfacción usando Memoización basada en TABLAS DE HASH (Diccionarios).
+    Estructuralmente idéntica a la versión de array, pero cambia el almacenamiento.
+    """
+    n_slices = len(st)
+    n = n_slices // 2
+    doubled_st = st + st
+    
+    prefix_sum =  * (len(doubled_st) + 1)
+    for i in range(len(doubled_st)):
+        prefix_sum[i+1] = prefix_sum[i] + doubled_st[i]
 
-    def dp(start: int, length: int, turn: int) -> int:
-        key = (start, length, turn)
-        if key in memo:
-            return memo[key]
-        # Caso base
+    def get_sum(start, length):
+        return prefix_sum[start + length] - prefix_sum[start]
+
+    # Diccionario para memoización
+    # Clave: Tupla (start, length) -> Valor: int
+    memo: Dict, int] = {}
+
+    def dp(start: int, length: int) -> int:
         if length == 1:
-            res = w[start] if turn == 0 else 0
-            memo[key] = res
-            return res
-        if turn == 0:
-            mejor = INF_NEG
-            for s in range(1, length):
-                ganancia_prefijo = rango_suma(pref, start, start + s - 1)
-                valor_prefijo = ganancia_prefijo + dp(start + s, length - s, 1)
-                if valor_prefijo > mejor:
-                    mejor = valor_prefijo
-                inicio_suf = start + length - s
-                ganancia_sufijo = rango_suma(pref, inicio_suf, start + length - 1)
-                valor_sufijo = ganancia_sufijo + dp(start, length - s, 1)
-                if valor_sufijo > mejor:
-                    mejor = valor_sufijo
-            memo[key] = mejor
-            return mejor
-        # Hermana minimiza
-        peor = INF_POS
-        for s in range(1, length):
-            valor_prefijo = dp(start + s, length - s, 0)
-            if valor_prefijo < peor:
-                peor = valor_prefijo
-            valor_sufijo = dp(start, length - s, 0)
-            if valor_sufijo < peor:
-                peor = valor_sufijo
-        memo[key] = peor
-        return peor
+            return doubled_st[start]
+        
+        state = (start, length)
+        if state in memo:
+            return memo[state]
 
-    mejor_global = INF_NEG
-    for k in range(2 * n):
-        ganancia_inicial = sum(values[(k + t) % (2 * n)] for t in range(n))
-        inicio_restante = k + n
-        valor_restante = dp(inicio_restante, n, 1)
-        total = ganancia_inicial + valor_restante
-        if total > mejor_global:
-            mejor_global = total
-    return mejor_global
+        current_total = get_sum(start, length)
+        min_opp = float('inf')
 
+        for k in range(1, length):
+            val_left = dp(start, k)
+            val_right = dp(start + length - k, k)
+            min_opp = min(min_opp, val_left, val_right)
+            
+        res = current_total - min_opp
+        memo[state] = res
+        return res
 
-def main() -> None:
-    """Punto de entrada interactivo.
+    total_cake = get_sum(0, n_slices)
+    max_prof = -float('inf')
 
-    Permite al usuario ingresar un valor ``n`` y los ``2n`` valores de
-    satisfacción, y muestra el resultado obtenido por ambas versiones
-    de la programación dinámica.
-    """
-    print("=== Problema Feliz Cumpleaños :D ===")
-    n = int(input("Ingresa n (habrá 2n porciones): ").strip())
-    valores_str = input(
-        f"Ingresa los {2 * n} valores de satisfacción separados por espacio:\n"
-    ).strip().split()
-    if len(valores_str) != 2 * n:
-        raise ValueError(
-            f"Se esperaban {2 * n} valores, pero se recibieron {len(valores_str)}."
-        )
-    values = list(map(int, valores_str))
-    print("\nCalculando...\n")
-    res_arr = max_satisfaccion_array(values)
-    res_hash = max_satisfaccion_hash(values)
-    print("--- RESULTADOS ---")
-    print("DP con arreglos:", res_arr)
-    print("DP con hash:    ", res_hash)
-
-
-if __name__ == "__main__":
-    main()
+    for i in range(n_slices):
+        sister_best = dp(i + n, n)
+        prof_gain = total_cake - sister_best
+        if prof_gain > max_prof:
+            max_prof = prof_gain
+            
+    return max_prof
