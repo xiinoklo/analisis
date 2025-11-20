@@ -49,7 +49,7 @@ def medir_tiempo(func, values: List[int], repeticiones: int = 3) -> float:
     Ejecuta 'func(values)' un número de 'repeticiones' y retorna el promedio.
     Utiliza time.perf_counter() para medir tiempo de CPU/Wall-clock con alta precisión.
     """
-    tiempos =
+    tiempos = []
     for _ in range(repeticiones):
         inicio = time.perf_counter()
         func(values)
@@ -85,7 +85,7 @@ def graficar_tiempos(n_values, tiempos_array, tiempos_hash):
     plt.close(fig)
 
     # 3. Ratio Hash/Array: Factor Constante de Overhead
-    ratios =
+    ratios = []
     for t_h, t_a in zip(tiempos_hash, tiempos_array):
         if t_a > 1e-9: # Evitar división por cero
             ratios.append(t_h / t_a)
@@ -128,10 +128,10 @@ def experimento_tiempos():
     # Valores de n seleccionados para mostrar la curva de crecimiento.
     # Dado O(n^3), n=100 implica ~1 millón de operaciones base.
     # n=100 es razonable para una ejecución de segundos.
-    n_values = 
+    n_values = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
     
-    tiempos_array =
-    tiempos_hash =
+    tiempos_array = []
+    tiempos_hash = []
 
     print(f"{'n':<5} | {'2n':<5} | {'T_Array (s)':<12} | {'T_Hash (s)':<12}")
     print("-" * 45)
@@ -157,9 +157,6 @@ def experimento_tiempos():
     print("  - tiempos_loglog.png")
     print("  - ratio_hash_array.png")
     print("  - tiempos_normalizados.png")
-
-if __name__ == "__main__":
-    experimento_tiempos()
 
 if __name__ == "__main__":
     experimento_tiempos()
