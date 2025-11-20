@@ -80,6 +80,8 @@ def max_satisfaccion_array(st: List[int]) -> int:
     Complejidad Espacial: O(n^2)
     """
     n_slices = len(st)
+    if n_slices == 0:
+        return 0
     n = n_slices // 2
     
     # Duplicamos el arreglo para manejar la circularidad de manera lineal.
@@ -87,7 +89,7 @@ def max_satisfaccion_array(st: List[int]) -> int:
     doubled_st = st + st
     
     # Precomputamos sumas de prefijos para consultas de rango O(1)
-    prefix_sum =  * (len(doubled_st) + 1)
+    prefix_sum = [0] * (len(doubled_st) + 1)
     for i in range(len(doubled_st)):
         prefix_sum[i+1] = prefix_sum[i] + doubled_st[i]
 
@@ -111,43 +113,40 @@ def max_satisfaccion_array(st: List[int]) -> int:
             return doubled_st[start]
         
         # Verificar si ya está calculado
-        if memo[start][length]!= -float('inf'):
-            return memo[start][length]
+        if memo[start % n_slices][length]!= -float('inf'):
+            return memo[start % n_slices][length]
 
         current_total_value = get_sum(start, length)
         
-        # Lógica Minimax:
-        # El jugador actual hace un corte y deja un segmento al oponente.
-        # El oponente jugará óptimamente para maximizar SU ganancia en ese resto.
-        # Por tanto, el jugador actual obtiene:
-        # Total_Actual - (Lo máximo que el oponente puede sacar del resto)
-        # Para maximizar mi ganancia, debo MINIMIZAR la ganancia máxima del oponente.
+        # El jugador actual (maximizador) elige el corte 'k' que le da el mejor resultado.
+        # Su resultado es `total - ganancia_oponente`. Para maximizarlo, debe minimizar
+        # la ganancia del oponente. Para un 'k' dado, el oponente obtendrá
+        # min(dp(start, k), dp(start + length - k, k)), ya que el jugador actual
+        # elegirá si dejar el prefijo o el sufijo.
+        # El jugador actual debe entonces elegir el 'k' que maximice su propio resultado.
         
-        min_opponent_score = float('inf')
-        
-        # Iteramos sobre todos los cortes posibles.
-        # k representa el tamaño del segmento que se DEJA al oponente.
-        # Geométricamente, al cortar, se generan dos arcos. Uno se come, otro se deja.
-        # Podemos dejar el lado "izquierdo" (prefijo) o el "derecho" (sufijo).
-        
+        best_score_for_me = -float('inf')
+
         for k in range(1, length):
-            # Opción 1: Dejar el prefijo de longitud k al oponente
-            # El oponente jugará en dp(start, k)
+            # Oponente juega en prefijo de largo k -> Oponente gana dp(start, k)
             val_left = dp(start, k)
             
-            # Opción 2: Dejar el sufijo de longitud k al oponente
-            # El oponente jugará en dp(start + length - k, k)
+            # Oponente juega en sufijo de largo k -> Oponente gana dp(start + length - k, k)
             val_right = dp(start + length - k, k)
             
-            # Buscamos el escenario donde el oponente gane lo MENOS posible
-            move_min = min(val_left, val_right)
+            # Yo elijo el corte que DEJA MENOS al oponente para este k.
+            opponent_score = min(val_left, val_right)
             
-            if move_min < min_opponent_score:
-                min_opponent_score = move_min
+            # Mi puntaje para este k es el total menos lo que se lleva el oponente.
+            my_score = current_total_value - opponent_score
+            
+            # Quiero encontrar el k que maximice mi puntaje.
+            if my_score > best_score_for_me:
+                best_score_for_me = my_score
         
-        # Mi mejor resultado es el total menos lo mejor que pude forzar al oponente a tener
-        res = current_total_value - min_opponent_score
-        memo[start][length] = res
+        # Mi mejor resultado es el máximo que encontré.
+        res = best_score_for_me
+        memo[start % n_slices][length] = res
         return res
 
     # Problema Original: El Profesor elige el primer corte de tamaño n.
@@ -174,10 +173,12 @@ def max_satisfaccion_hash(st: List[int]) -> int:
     Estructuralmente idéntica a la versión de array, pero cambia el almacenamiento.
     """
     n_slices = len(st)
+    if n_slices == 0:
+        return 0
     n = n_slices // 2
     doubled_st = st + st
     
-    prefix_sum =  * (len(doubled_st) + 1)
+    prefix_sum = [0] * (len(doubled_st) + 1)
     for i in range(len(doubled_st)):
         prefix_sum[i+1] = prefix_sum[i] + doubled_st[i]
 
@@ -186,25 +187,37 @@ def max_satisfaccion_hash(st: List[int]) -> int:
 
     # Diccionario para memoización
     # Clave: Tupla (start, length) -> Valor: int
-    memo: Dict, int] = {}
+    memo: Dict[Tuple[int, int], int] = {}
 
     def dp(start: int, length: int) -> int:
         if length == 1:
             return doubled_st[start]
         
-        state = (start, length)
+        state = (start % n_slices, length)
         if state in memo:
             return memo[state]
 
-        current_total = get_sum(start, length)
-        min_opp = float('inf')
+        current_total_value = get_sum(start, length)
+        best_score_for_me = -float('inf')
 
         for k in range(1, length):
+            # Oponente juega en prefijo de largo k -> Oponente gana dp(start, k)
             val_left = dp(start, k)
-            val_right = dp(start + length - k, k)
-            min_opp = min(min_opp, val_left, val_right)
             
-        res = current_total - min_opp
+            # Oponente juega en sufijo de largo k -> Oponente gana dp(start + length - k, k)
+            val_right = dp(start + length - k, k)
+            
+            # Yo elijo el corte que DEJA MENOS al oponente para este k.
+            opponent_score = min(val_left, val_right)
+            
+            # Mi puntaje para este k es el total menos lo que se lleva el oponente.
+            my_score = current_total_value - opponent_score
+            
+            # Quiero encontrar el k que maximice mi puntaje.
+            if my_score > best_score_for_me:
+                best_score_for_me = my_score
+
+        res = best_score_for_me
         memo[state] = res
         return res
 
@@ -218,3 +231,26 @@ def max_satisfaccion_hash(st: List[int]) -> int:
             max_prof = prof_gain
             
     return max_prof
+
+if __name__ == "__main__":
+    print("Problema de la Torta - Maximización de Satisfacción")
+    print("----------------------------------------------------")
+    print("Ingrese los valores de satisfacción de las 2n porciones de torta, separados por espacios.")
+    
+    try:
+        input_line = input("Valores: ")
+        satisfacciones = [int(x) for x in input_line.split()]
+        
+        if not satisfacciones:
+            print("Error: No se ingresaron valores.")
+        elif len(satisfacciones) % 2 != 0:
+            print("Error: El número de porciones debe ser par (2n).")
+        else:
+            # Usamos la versión con arrays por defecto
+            resultado = max_satisfaccion_array(satisfacciones)
+            print(f"\nMáxima satisfacción que el profesor puede garantizar: {resultado}")
+
+    except ValueError:
+        print("\nError: Ingrese solo números enteros separados por espacios.")
+    except Exception as e:
+        print(f"\nOcurrió un error inesperado: {e}")
